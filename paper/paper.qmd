@@ -1,0 +1,601 @@
+---
+title: "Large language models for aspect-based sentiment analysis"
+format:
+  arxiv-pdf:
+    keep-tex: true  
+    linenumbers: false
+    doublespacing: false
+    runninghead: "A Preprint"
+  arxiv-html: default
+jupyter: python3
+execute:
+  echo: false
+author:
+  - name: Paul F. Simmering
+    affiliations:
+      - name: Q Agentur für Forschung GmbH
+    email: paul.simmering@teamq.de
+  - name: Paavo Huoviala
+    affiliations:
+      - name: Q Agentur für Forschung GmbH
+    orcid: 0000-0003-2402-304X
+    email: paavo.huoviala@teamq.de
+abstract: |
+  Large language models (LLMs) offer unprecedented text completion capabilities. As general models, they can fulfill a wide range of roles, including those of more specialized models. We assess the performance of GPT-4 and GPT-3.5 in zero shot, few shot and fine-tuned settings on the aspect-based sentiment analysis (ABSA) task. Fine-tuned GPT-3.5 achieves a state-of-the-art F1 score of 83.8 on the joint aspect term extraction and polarity classification task of the SemEval-2014 Task 4, improving upon InstructABSA [@scaria_instructabsa_2023] by 5.7%. However, this comes at the price of 1000 times more model parameters and thus increased inference cost. We discuss the the cost-performance trade-offs of different models, and analyze the typical errors that they make. Our results also indicate that detailed prompts improve performance in zero-shot and few-shot settings but are not necessary for fine-tuned models. This evidence is relevant for practioners that are faced with the choice of prompt engineering versus fine-tuning when using LLMs for ABSA.
+keywords: 
+  - aspect-based sentiment analysis (ABSA)
+  - large language models (LLMs)
+  - GPT 
+  - few-shot learning
+  - prompt engineering
+bibliography: bibliography.bib
+---
+
+```{python}
+import pandas as pd
+import numpy as np
+
+from plotnine import (
+    aes,
+    geom_line,
+    geom_point,
+    geom_text,
+    ggplot,
+    guides,
+    labs,
+    scale_x_continuous,
+    scale_color_discrete,
+    theme,
+    theme_minimal,
+    element_text,
+    facet_wrap,
+)
+
+from absa_llm import board
+
+```
+
+
+# Introduction
+
+Aspect-based sentiment analysis (ABSA) is used for providing insights into digitized texts, such as product reviews or forum discussions, and is therefore a key capability for fields such as digital social sciences, humanities, and market research. It offers a more detailed view of reviews compared to conventional sentiment analysis, which typically categorizes the overall sentiment of a whole text as positive, negative, or neutral [@turney2002; @pang-etal-2002-thumbs]. The SemEval-2014 challenge [@pontiki_semeval-2014_2014] proposed an aspect term extraction (ATE) and an aspect term sentiment classification (ATSC) tasks. These can be merged into a joint task, where the goal is to simultaneously extract aspect terms and classify their polarity. We focus our efforts on the joint task in the present study [^1]. 
+
+[^1]: Code available at [https://github.com/qagentur/absa_llm](https://github.com/qagentur/absa_llm)
+
+A wide array of specialized models have been developed for ABSA. With the emergence of pre-trained language models like BERT [@devlin_bert_2019], the field has witnessed significant advancements in accuracy, particularly in transformer-based models that incorporate task-specific output layers. @zhang_survey_2022 provide a comprehensive survey of similar models in the domain. PyABSA [@yang_pyabsa_2023] is notable for its collection of ABSA datasets and models for various ABSA tasks and across multiple languages.
+
+OpenAI has reshaped the field of Natural Language Processing (NLP) in the recent years with their family of Generative Pre-trained Transformer models, GPTs [@DBLP:journals/corr/abs-2005-14165; @ouyang2022training; @openai2023gpt4]. GPTs are generalist large language models (LLMs) with a very wide range of demonstrated capabilities ranging from classic NLP tasks to causal reasoning, and even functional knowledge in specialized domains like medicine or law [@mao2023gpteval]. @zhang_sentiment_2023 investigated the accuracy of LLMs for sentiment analysis and found non-finetuned LLMs generally capable, but not on par with specialized models, on complex tasks such as ABSA. They also emphasize that the choice of prompt is critical for performance.
+
+InstructABSA is the current state of the art for ABSA. It utilizes a a fine-tuned T5 model [@wang_super-naturalinstructions_2022] along with prompt instructions for improved performance. 
+
+To investigate how well do the current generation of LLMs are able to perform ABSA, we test the performance of GPT-3.5 and GPT-4 (pinned model gpt-3.5-turbo-0613 and gpt-4-0613 available through OpenAI API) using a range of conditions, and compare their performance to that of InstructABSA, the state-of-the-art model for the SemEval-2014 Task 4 Joint Task. **Table 1** contains an overview of the tested models. The selection leaves out some notable high performance LLMs, such as Meta's Llama2 [@touvron2023llama], Anthropic's Claude2, and Google's Bard.
+
+
+| | GPT-4 | GPT-3.5 | GPT-3.5 fine tuned | InstructABSA |
+| --- | --- | --- | --- | --- |
+| Base model | GPT-4 | GPT-3.5 | GPT-3.5 | T5 |
+| Parameters | ~1.7T[^2] | 175B | 175B | 200M |
+| Fine-tuning | Not available | No | SemEval-2014 | SemEval2014 |
+| Language | Multilingual | Multilingual | English | English |
+| Availability | Commercial | Commercial | Commercial, custom | Open source |
+
+: Model comparison
+
+[^2]: The number of parameters of GPT-4 is currently not disclosed by OpenAI. Internet rumors put it at 1.7T. We use this number for comparison purposes.
+
+# Methods & Data
+
+We evaluate performance on the gold standard benchmark dataset SemEval2014 [@pontiki_semeval-2014_2014], consisting of human annotated laptop and restaurant reviews. Model performance is measured on a joint aspect term extraction and polarity classification task with using F1 score as the main performance metric. We test multiple prompt variations, the number of provided in-context examples, and fine-tune the models via the OpenAI's API. **Figure 1** shows the overview of the experimental set-up. We also break down the types of False positive errors that the models make in order to get a better understanding on their strengths and weaknesses, and compare costs and cost-efficiency of the different options.
+
+![Overview of experimental setup](schematic.png)
+
+## Data
+
+The SemEval-2014 dataset contains human-annotated sentences from laptop and restaurant reviews. The original 2014 dataset has 4 polarity labels: positive, negative, neutral and conflict. To maintain consistency with InstructABSA and previous models, we also exclude examples with the "conflict" label. The examples that include them were removed completely, rather than just removing the "conflict" labeled aspects, to avoid the case where the text contains aspects that the model is not supposed to label. Altogether, 126 examples were removed from the training set and 28 from the test set, leaving 5759 in training and 1572 in test.
+
+We used up to 10 examples from the training set for in-context instructions and the whole training set for fine-tuning. During fine-tuning, we reserved 20% of the training set for validation. We used the test set to evaluate the final model performance.
+
+## Prompts
+
+The prompts for this study are structured in 3 parts: 1) a task description in the system message 2) and optional a set of in-context examples also included in the system message 3) a JSON schema defining the expected output format.
+
+### Task description
+
+The task description is a short text that instructs the model. Altogether, we used 9 different task descriptions (see **Table 2**; see Appendix for full prompt texts). They primarily consisted of variations of the original annotation guidelines for the SemEval2014 task and the prompt used in the state-of-the-art model, InstructABSA. In addition, we also added a task description to attempt to coax the generalist GPT model to behave as a specialist model (*Roleplay*), and to perform the task in a step-wise manner (*Separate tasks*). Finally, we added two controls: a minimal one sentence summary of the task (*Minimal*), and a *No prompt* control that was only tested on the fine-tuned models.
+
+The *Reference* task description explicitly taps into GPT-4's pre-existing knowledge of SemEval-2014 by referencing the task by name.
+
+The *Guidelines summary* was created by GPT-4 itself. We pasted the original annotation guidelines into the OpenAI API playground and asked the model to summarize them. The resulting summary was then used as the task description.
+
+### In-context examples
+
+The examples provided as part of the completion request enable in-context learning without changing the model's parameters [@liu2021makes]. Further, they introduce the output format to the model. Providing examples can have a large positive impact on model performance of text-to-text models in classification tasks and @min_rethinking_2022 show that the main benefit stems from establishing the answer format and providing information on the distribution of tokens.
+
+We tested a range of in-context example conditions. The examples were manually picked from the training set based on the curriculum learning [@bengio_curriculum_2009] concept, meaning that a series of examples starts with the simplest case and builds to complex edge cases. We tested the following conditions, each building on the previous:
+
+- 0 shot
+- 2 shot: one basic example per review domain (restaurants and laptops) showing typical case
+- 4 shot: two basic examples per domain, show variety of outputs
+- 6 shot: three examples per domain
+- 10 shot: same as above, plus hard examples for each domain to teach edge cases
+
+Full texts are provided in the appendix.
+
+### Chat interface
+
+In contrast to prior models, GPT-3.5 and GPT-4 use a chat interface rather than a pure text-to-text interface. The chat starts with a system message, which can be used for providing the task description. 
+The model then predicts an answer and the resulting format is a dialogue between user messages and assistant responses.
+
+This presents two options for including in-context examples for the task. Either they are included in the system message, or they are presented as pairs of user and assistant messages already in the dialogue. We tested both options in a preliminary experiment and found that GPT-3.5's performance benefits only from the examples in the system message. For example, for the *Guidelines summary* prompt increasing the number of in-context examples from 0 to 6 increased the F1 score from 64.3 to 65.7 when the examples were provided within the system message, while same examples actually decreased F1 score from 64.3 to 60.0 when the examples were provided outside of the system message. GPT-4's performance appears to benefit from both options, but we chose to include the examples in the system message for both models.
+
+## Function schema
+
+As the GPT models are text-to-text models, having a standardized output format is crucial for its usefulness in a structured task like ABSA. Prior studies by @zhang_sentiment_2023 and @scaria_instructabsa_2023 have devised custom formats and instructed the model to use them in the prompt. We opted for JSON as a standard and use OpenAI's *function calling* feature to enforce the format: As part of the inference command, the model is instructed to call a function with the generated text as input. This function describes the expected output format using a JSON schema, standardizing the model outputs. The JSON schema used has description fields and informative field names, which act as further in-context instructions.
+
+Given an input text "The fajitas are tasty" the schema would then become:
+
+```
+"input": "The fajitas are tasty"
+"output": {"aspects": [{"aspect": "fajitas", "polarity": "positive"}]}
+```
+
+## Fine tuning GPT-3.5
+
+We fine-tuned GPT-3.5 on the examples from the training set for 3 epochs using an 80/20 train/validation split. A system message prompt can be provided for fine-tuning and for optimal performance. The same system message should be included at inference time. To test the influence of the system prompt, we fine-tuned the model with three different prompt: *Guidelines summary*, *Minimal* system message, and without a system message (*No prompt*). 
+
+```{python}
+# | fig-cap: Fine-tuning
+runs = [
+    {
+        "pin_name": "finetune_results_finetune",
+        "system_message_shortname": "Minimal",
+    },
+    {
+        "pin_name": "finetune_results_empty",
+        "system_message_shortname": "Empty",
+    },
+    {
+        "pin_name": "finetune_results_semeval2014_guidelines_summary_gpt4",
+        "system_message_shortname": "Guidelines summary",
+    },
+]
+
+finetune_results = (
+    pd.concat(
+        [
+            board.pin_read(run["pin_name"])
+            .assign(system_message_shortname=run["system_message_shortname"])
+            .replace({"system_message_shortname": {"Empty": "No prompt"}})
+            for run in runs
+        ]
+    )
+    .reset_index()
+    .set_index(["step", "system_message_shortname"])
+)
+
+# Remove rows with missing values
+finetune_results = finetune_results.dropna()
+
+finetune_results_melted = finetune_results.reset_index().melt(
+    id_vars=["step", "system_message_shortname"], var_name="metric", value_name="value"
+)
+
+# Rename the metrics, replacing _ with spaces and using title case
+finetune_results_melted["metric"] = (
+    finetune_results_melted["metric"]
+    .str.replace("_", " ")
+    .str.replace("valid", "validation")
+    .str.title()
+)
+
+finetune_results_plot = (
+    ggplot(finetune_results_melted)
+    + aes(
+        x="step",
+        y="value",
+        color="system_message_shortname",
+        linetype="system_message_shortname",
+    )
+    + geom_line()
+    + labs(
+        x="Step",
+        y="",
+        color="System message",
+        linetype="System message",
+    )
+    + theme_minimal(base_size=10)
+    + theme(legend_position="top")
+    + facet_wrap("metric", scales="free_y")
+)
+
+print(finetune_results_plot)
+```
+
+Training converged quickly in all cases (**Figure 2**). Further epochs are unlikely to improve performance because a training accuracy of 100% was reached. Validation accuracy fluctuates around 76%.
+
+The resulting fine-tuned models do not need a JSON schema to produce structured output, as they have learned the expected JSON format. Parsing the returned strings as JSON did not produce any errors. This reduces the number of input tokens required for inference.
+
+## Parameters
+
+We iterated on the number of in-context examples and prompt variations. Temperature was set to 0 to get near-deterministic results. Other parameters were left at their default values.
+
+# Results
+
+## Prompts
+
+As prompt selection and tuning is a key step for successful use of a task-agnostic text-to-text model like GPT, we first wanted to find out which prompt variants gave the best results in the task. We tested the prompt variations using GPT-3.5. Results are summarised in **Table 2**. Overall, the prompts gave fairly similar results and adding in-context examples did not improve performance significantly, with the exceptions of the *InstructABSA* and *Minimal* prompts. Using 6 in-context examples was better than 10 for almost all tested prompts. Examples 7-10 were purposefully selected to represent difficult cases and apparently failed to be useful for the task. The *Guidelines summary* provided the best average performance (F1: 64.99) across the tested in-context examples conditions, by a narrow margin. Overall, GPT-3.5 (without fine-tuning) did not attain the performance levels of modern specialized models for ABSA.
+
+```{python}
+# | output: asis
+prompt_comparison = board.pin_read("prompt_comparison")
+
+prompt_descriptions = {
+    "Guidelines summary": "Summary of the guidelines created by GPT-4",
+    "Annotation guidelines": "Official guide for SemEval-2014 Task 4",
+    "Roleplay": "Pretend to be a specialized machine learning model",
+    "Reference": "Name-drop SemEval-2014 Task 4",
+    "InstructABSA with examples": "InstructABSA prompt + 6 examples from paper",
+    "Separate tasks": "2 steps: Term extraction, polarity classification",
+    "InstructABSA": "InstructABSA prompt",
+    "Minimal": "One sentence summary of task.",
+    "Empty": "An empty prompt.",
+}
+
+# Write it as a table too
+# 1 row per shortname,  the f1 score with 0 examples and the f1 score with 10 examples
+prompt_comparison_table = (
+    prompt_comparison.assign(f1=lambda x: round(x["f1"] * 100, 2))
+    .pivot(index="system_message_shortname", columns="in_context_examples", values="f1")
+    .rename(columns={0: "f1_0_examples", 6: "f1_6_examples", 10: "f1_10_examples"})
+    .reset_index()
+    .assign(
+        description=lambda x: x["system_message_shortname"].map(prompt_descriptions)
+    )
+    .sort_values(by="f1_10_examples", ascending=False)
+    .loc[
+        :,
+        [
+            "system_message_shortname",
+            "description",
+            "f1_0_examples",
+            "f1_6_examples",
+            "f1_10_examples",
+        ],
+    ]
+)
+
+# Add system_message_tokens into the table and clean column names
+prompt_comparison_table = (
+    prompt_comparison_table.merge(
+        prompt_comparison.groupby("system_message_shortname")["system_message_tokens"]
+        .first()
+        .reset_index(),
+        on="system_message_shortname",
+        how="left",
+    )
+    .rename(
+        {
+            "system_message_shortname": "Prompt",
+            "system_message_tokens": "Prompt tokens",
+            "description": "Description",
+            "f1_0_examples": "F1, 0 examples",
+            "f1_6_examples": "F1, 6 examples",
+            "f1_10_examples": "F1, 10 examples",
+        },
+        axis=1,
+    )
+    .reindex(
+        [
+            "Prompt",
+            "Prompt tokens",
+            "Description",
+            "F1, 0 examples",
+            "F1, 6 examples",
+            "F1, 10 examples",
+        ],
+        axis=1,
+    )
+)
+
+print(prompt_comparison_table.to_markdown(index=False))
+print(": Task description variants (GPT-3.5)")  # table caption
+
+```
+
+## GPT-4 and fine-tuned GPT 3.5 model performance
+
+Next, we conducted experiments using an updated model, GPT-4. We chose the *Guidelines summary* prompt for this, as it was the best performing prompt on GPT-3.5. Surprisingly, in the zero-shot condition, GPT-4 exhibited slightly lower performance compared to GPT-3.5, achieving an F1 score of 57.6. However, its performance notably improved with the inclusion of in-context examples, surpassing GPT-3.5 in the 6 and 10 example conditions, reaching a peak F1 score of 71.3.
+
+In contrast, the three fine-tuned GPT-3.5 models consistently outperformed the previous state-of-the-art model, InstructABSA [@scaria_instructabsa_2023], even with no in-context examples provided (**Figure 3**). All three tested models demonstrated remarkably similar performance. Notably, the *Minimal prompt* achieved the highest F1 score at 83.8, and even the *No prompt* model outperformed the previous state-of-the-art. The addition of extra in-context examples did not yield significant performance gains, but rather, even resulted in a mild performance decrease (tested only on the *Minimal prompt*). This possibly reflects the mismatch between the system message seen in fine-tuning and the system message with in-context examples at inference time. Collectively, these findings suggest that for a relatively straightforward task like ABSA, optimal performance is achieved by fine-tuning the model and allowing it to learn the task directly from the training data.
+
+
+```{python}
+# | warning: false
+# | fig-cap: Model comparison by number of in-context examples
+
+metrics_macro_cross_domain = board.pin_read("metrics_macro_cross_domain")
+
+best_prompt_test_runs = metrics_macro_cross_domain.query(
+    "(system_message_shortname == 'Guidelines summary' | system_message_shortname == 'Empty' | system_message_name == 'finetune')"
+    "& split == 'test'"
+    "& (examples_in_separate_messages == False | in_context_examples == 0)"
+    "& examples == 1572"
+).reset_index()
+
+best_prompt_test_runs["f1"] = best_prompt_test_runs["f1"] * 100
+best_prompt_test_runs["f1_label"] = best_prompt_test_runs["f1"].round(1).astype(str)
+
+# Define non-redundant names for the plot
+for index, row in best_prompt_test_runs.iterrows():
+    if "finetuned" in row["model_shortname"]:
+        best_prompt_test_runs.at[index, "plot_name"] = row["model_shortname"]
+    else:
+        best_prompt_test_runs.at[index, "plot_name"] = (
+            row["model_shortname"] + " " + row["system_message_shortname"] + " prompt"
+        )
+
+# Mask some of the labels in plot to avoid overlap
+best_prompt_test_runs.loc[
+    best_prompt_test_runs["plot_name"]
+    == "GPT-3.5 finetuned, guidelines summary prompt",
+    "f1_label",
+] = ""
+best_prompt_test_runs.loc[
+    best_prompt_test_runs["plot_name"] == "GPT-3.5 finetuned, no prompt", "f1_label"
+] = ""
+
+# Create a column to specify the legend order
+best_prompt_test_runs["plot_name"] = pd.Categorical(
+    best_prompt_test_runs["plot_name"],
+    categories=[
+        "GPT-3.5 finetuned, minimal prompt",
+        "GPT-3.5 finetuned, guidelines summary prompt",
+        "GPT-3.5 finetuned, no prompt",
+        "GPT-4 Guidelines summary prompt",
+        "GPT-3.5 Guidelines summary prompt",
+        "GPT-3.5 Minimal prompt",
+    ],
+    ordered=True,
+)
+
+# Plot
+model_comparison = (
+    ggplot(
+        best_prompt_test_runs,
+        aes(x="in_context_examples", y="f1", color="plot_name", shape="plot_name"),
+    )
+    + geom_point(size=2)
+    + geom_line(size=1, alpha=0.5)
+    + geom_text(aes(label="f1_label"), size=8, nudge_y=1.5, color="black")
+    + scale_x_continuous(
+        breaks=range(0, 11, 2),
+    )
+    + labs(x="In-context examples", y="F1 score", color="", shape="")
+    + scale_color_discrete(
+        limits=[
+            "GPT-3.5 finetuned, minimal prompt",
+            "GPT-3.5 finetuned, guidelines summary prompt",
+            "GPT-3.5 finetuned, no prompt",
+            "GPT-4 Guidelines summary prompt",
+            "GPT-3.5 Guidelines summary prompt",
+            "GPT-3.5 Minimal prompt",
+        ]
+    )
+    + theme_minimal(base_size=10)
+    + theme(legend_position="right", figure_size=(6, 3))
+)
+
+
+print(model_comparison)
+```
+
+## Error Analysis
+
+Overall, the fine-tuned GPT-3.5 models are both more sensitive and more specific than either GPT-3.5 or GPT-4. The tine-tuned GPT-3.5 makes 50% less errors than the best GPT-3.5 model, and 42% less than GPT-4, while correctly detecting and classifying 34% (vs. GPT-3.5) or 21% (vs. GPT-4) more aspect term-polarity pairs than the other tested models. **Table 3** shows error metrics for each model. 
+
+
+
+```{python}
+# | label: table-error-analysis
+# | output: asis
+error_analysis = board.pin_read("error_analysis")
+error_analysis_print = (
+    error_analysis.reset_index()
+    .rename(
+        {
+            "model_shortname": "Model",
+            "tp": "TP",
+            "fn": "FN",
+            "fp": "FP",
+            "fp_terms_in_text_count": "FP:Predicted aspect not in gold set",
+            "fp_wrong_polarity_count": "FP:Polarity classification",
+            "fp_aspect_boundary_errors": "FP:Aspect boundaries",
+            "fp_terms_not_in_text_count": "FP:Made up terms",
+        },
+        axis=1,
+    )
+    .sort_values("Model")
+    .drop(["index"], axis=1)[
+        [
+            "Model",
+            "TP",
+            "FN",
+            "FP",
+            "FP:Predicted aspect not in gold set",
+            "FP:Polarity classification",
+            "FP:Aspect boundaries",
+            "FP:Made up terms",
+        ]
+    ]
+)
+
+print(error_analysis_print.to_markdown(index=False))
+print(": Error analysis by model")  # table caption
+```
+
+
+In order to find out what kinds of errors the models make, we also broke down the false positives further into the following error sub-types:
+
+- *Predicted aspect not in gold set*: The model extracts a term from the text that is not found in the gold aspect set.
+- *Polarity classification*: The model correctly extracts an aspect term but misclassifies its polarity.
+- *Aspect boundaries*: The model partially extracts an aspect term that has more or fewer tokens than the gold aspect term.
+- *Made up terms*: The model predicts an aspect term that is not found in the text.
+
+In aggregate, the most common error sub-type is *Predicted aspect not in gold set*. These were often terms that could be of interest in a real-world use-case, but broke some annotation rules of the benchmark dataset. For example, labeling non-noun terms in a sentence like: *"It's fast [positive], quiet [positive], incredibly small [positive] and affordable [positive]."* Fine-tuning the model had also the biggest effect here, leading to up to ~88% reduction of this type of FPs.
+
+The second most common error sub-type is the *Polarity classification* error. For example, in the sentence
+*"The MAC Mini [positive], wireless keyboard / mouse [positive] and a HDMI cable [positive] is all I need to get some real work done."* GPT-3.5 labeled multiple of the listed features of the computer as positive. However, these were annotated as neutral aspects in the gold set, as no specific positive qualities about the features were explicitly mentioned in the review. Overall, we observed that all of the models over-predicted the number of positive and negative labels and under-predicted the number of neutral labels. It is also worth noting that the *polarity classification* errors increase with model performance, as a prerequisite for polarity classification is that the aspect term is extracted correctly.
+
+The third most common are *Aspect boundary* issues. For example, in the sentence *"The Mini's body hasn't changed since late 2010- and for a good reason."* GPT-4 extracted the term "Mini's body" whereas only the term "body" is labelled in the gold set. 
+
+Finally, we also occasionally saw the models identifying terms that were not present in the text. These tended to be abstractions of the sentence content, such labeling "speed" and "performance" in the sentence *"It is extremely fast and never lags"*. GPT-3.5 has a notably high number of made up terms, seemingly failing to learn the instruction that the aspect terms must be extracted verbatim. However, altogether this error sub-types were not that common and finetuning almost completely eliminated the issue.
+
+On the whole, the errors are typically related to the idiosyncrasies of the benchmark dataset. In a few-shot setting, the LLM struggles to pick up on the nuances of labeling rules, instead delivering more commonsense labels. This ties into remarks by @zhang_sentiment_2023 who found that LLMs are capable of ABSA, but not with the precise format required by the benchmark dataset. While such errors hamper benchmark performance, they should not necessarily discourage from using LLMs in real-world applications of ABSA or similar tasks. In domains like market research it may be preferable to for example also extract non-noun and abstracted terms,
+
+
+## Economic analysis
+
+LLMs are computationally expensive to train and use. With OpenAI users pay based on both the number of input and output tokens[^4]. OpenAI charges eight times more for input and output tokens for fine-tuned GPT-3.5 models than for the default model. However, fine-tuned models do not require the use of a JSON schema, reducing the number of input tokens required. As demonstrated by our results, fine-tuned models are also not reliant on relatively long prompts or presence of in-context examples. Thus, they can lead to cost savings and providing more accurate results with a lower overall cost. See **Table 4** for the overall cost summary of the tested model versions and conditions. 
+
+[^4]: https://openai.com/pricing
+
+```{python}
+# | output: asis
+
+metrics_macro_cross_domain = board.pin_read("metrics_macro_cross_domain")
+price_by_run = (
+    metrics_macro_cross_domain.reset_index()
+    .query(
+        """
+    examples == 1572 and in_context_examples in [0, 6] and system_message_shortname in ["Guidelines summary", "Empty", "Minimal"]
+    """
+    )
+    .assign(json_schema=lambda data: data["model_shortname"].isin(["GPT-3.5", "GPT-4"]))
+    .assign(table_name=lambda data: data["model_shortname"].str.split(",").str[0])
+    .loc[
+        :,
+        [
+            "table_name",
+            "system_message_shortname",
+            "json_schema",
+            "in_context_examples",
+            "f1",
+            "price_total",
+        ],
+    ]
+    .drop_duplicates(
+        subset=[
+            "table_name",
+            "system_message_shortname",
+            "json_schema",
+            "in_context_examples",
+        ]
+    )
+    .replace({"system_message_shortname": {"Empty": "No prompt"}})
+    .rename(
+        {
+            "table_name": "Model",
+            "system_message_shortname": "Prompt",
+            "json_schema": "JSON schema",
+            "in_context_examples": "In-context examples",
+            "f1": "F1 score",
+            "price_total": "Cost (USD)",
+        },
+        axis=1,
+    )
+)
+
+# Add in InstructABSA values to the table
+instructabsa = pd.DataFrame(
+    {
+        "Model": ["InstructABSA"],
+        "Prompt": ["InstructABSA prompt"],
+        "JSON schema": ["False"],
+        "In-context examples": ["6"],
+        "F1 score": [0.793],
+        "Cost (USD)": [0.05],
+    }
+)
+
+price_by_run = pd.concat([price_by_run, instructabsa])
+price_by_run.sort_values(by="F1 score", ascending=False, inplace=True)
+
+# Round f1 score and cost to 2 decimals
+price_by_run_print = price_by_run.copy()
+price_by_run_print["F1 score"] = price_by_run_print["F1 score"].round(4) * 100
+price_by_run_print["Cost (USD)"] = price_by_run_print["Cost (USD)"].round(2)
+
+# Add an Performance / USD  column
+price_by_run_print["F1 / USD"] = (
+    price_by_run_print["F1 score"] / price_by_run_print["Cost (USD)"]
+)
+price_by_run_print["F1 / USD"] = price_by_run_print["F1 / USD"].round(2)
+
+print(price_by_run_print.to_markdown(index=False))
+print(": Cost comparison")  # table caption
+
+```
+
+In real-world applications with significantly larger datasets than the benchmark set used here, it is worth considering that InstructABSA is still significantly cheaper to operate, while providing near state-of-the-art results, with a run amounting to less than $0.05 when executed on a single vCPU on AWS or a similar cloud provider. GPT-4 on the other hand, is the strongest model available in a low computational resource setting and no access to training data for fine-tuning, but also by far the most expensive model to operate, reflecting its high parameter count. Notably, when measuring cost-efficiency as a ratio of obtained F1 score divided by the run cost, InstructABSA is more than 300-fold better than the best performing GPT-4 model, but only ~7-fold better than the most efficient fine-tuned GPT-3.5 model.
+
+
+# Discussion
+
+We explore the application of OpenAI's LLMs for the classic NLP task of aspect based sentiment analysis (ABSA). We focus on the joint aspect term extraction and polarity classification task on the widely used SemEval-2014 benchmark dataset. A fine-tuned GPT-3.5 model achieved state-of-the-art performance on the ABSA joint task (83.8% F1 score) on the benchmark task. Fine-tuning the model also emerged as the most efficient option for the task, offering superior performance without the need for extensive prompt engineering. This not only saves time but also reduces token consumption, both valuable aspects in real-world applications.
+
+Our analysis revealed that the errors made by the not-fine tuned models were often related to discrepancies between the model's predictions and the idiosyncrasies of the benchmark dataset's annotation rules. GPT-3.5 and 4 offered often sensible term-polarity predictions that just failed to take the intricacies of all the annotation rules into account, whereas fine-tuning seemed to align the models better with this specific formulation of the ABSA task. This is supported by how the main performance increase between the basic and fine-tuned models seemed to result both from decreased number of False negatives as well as near 90% reduction in False positives of the *Predicted aspect not in gold set* sub-type (e.g. extracing non-noun phrases from review texts). 
+
+For the present paper, we limited our analysis to a single dataset and to the joint task. While this allowed us to be more focused in the optimization efforts, it also means that the generalizability of the findings to other datasets as well as to real-world use-cases remains a topic for further investigation. The annotation rules of SemEval 2014 specify that only noun phrases can be aspects. However, in real-world applications, it may be desirable to extract such aspects as well. For example, in market research, it may be of interest to extract aspects such as "speed" and "performance" from the sentence "It is extremely fast and never lags". This would require a different annotation scheme, and possibly a different task formulation.
+
+Another interesting further avenue for follow-up work would be to test the performance of a fine-tuned GPT-4 (unavailable at the time of writing) as well as compare the performance of GPT models to that of open source LLMs such as Llama 2 [@touvron_llama_2023]. Although the fine-tuning appeared to significantly decrease the importance of prompt-engineering in general, it might still be of interest to test for example the effects of chain of thought prompting and self-correction for performance.
+
+In conclusion, our research demonstrates the great potential of fine-tuned LLMs for ABSA. We found fine-tuning GPT-3.5 to the task particularly effective, offering state-of-the-art performance at a price point between InstructABSA and GPT-4. The performance and model size tradeoff reflects the trend in research on transformer models: increase in model size brings improved performance, but also increased computational and operational costs. While our study focused on a single benchmark dataset, it lays the foundation for broader exploration and implementation of LLMs in ABSA across diverse datasets and use cases.
+
+{{< pagebreak >}}
+
+# References {.unnumbered}
+
+::: {#refs}
+:::
+
+{{< pagebreak >}}
+# Appendix
+
+## Prompts
+
+```{python}
+# | output: asis
+
+system_messages = board.pin_read("system_messages").to_dict(orient="records")
+
+for msg in system_messages:
+    print(f"**Prompt: {msg['system_message_shortname']}**\n")
+
+    if msg["system_message_shortname"] == "Annotation guidelines":
+        link = "https://alt.qcri.org/semeval2014/task4/data/uploads/semeval14_absa_annotationguidelines.pdf"
+        print(f"Available at: [{link}]({link})\n")
+    else:
+        print(f"{msg['system_message']}\n")
+
+```
+
+## In-context examples
+
+```{python}
+# | output: asis
+
+examples = board.pin_read("examples").to_dict(orient="records")
+
+for i, example in enumerate(examples):
+    print(f"Example {i + 1}: \n")
+    print(f"User: {example['context']} \n")
+    print(f"Assistant: {example['completion']} \n")
+```
+
+## JSON schema
+
+```{python}
+# | output: asis
+function_schema = board.pin_read("function_schema")
+print(function_schema)
+```

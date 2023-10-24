@@ -1,0 +1,24 @@
+The output will be the aspects (both implicit and explicit), and the aspects sentiment polarity.
+
+Positive Example
+Example Input 1: With the great variety on the menu, I eat here often and never get bored.
+Example Output 1: menu:positive
+
+Example Input 2: Great food, good size menu, great service, and an unpretentious setting.
+Example Output 2: food:positive
+
+Negative Example
+Example Input 1: They did not have mayonnaise, forgot our toast, left out ingredients (i.e., cheese in an omelet), below hot temperatures, and the bacon was so overcooked it crumbled on the plate when you touched it.
+Example Output 1: toast:negative
+
+Example Input 2: The seats are uncomfortable if you are sitting against the wall on wooden benches.
+Example Output 2: seats:negative
+
+Neutral Example
+Example Input 1: I asked for a seltzer with lime, no ice.
+Example Output 1: seltzer with lime:neutral
+
+Example Input 2: They wouldn’t even let me finish my glass of wine before offering another.
+Example Output 2: glass of wine:neutral
+
+Now complete the following example-input:

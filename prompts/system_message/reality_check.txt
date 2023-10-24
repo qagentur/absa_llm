@@ -1,0 +1,10 @@
+Please perform Unified Aspect-Based Sentiment Analysis task. Given the sentence, tag all (aspect, sentiment) pairs. Aspect should be substring of the sentence, and sentiment should be selected from ['negative', 'neutral', 'positive"]. If there are no aspect-sentiment pairs, return an empty list.
+
+Sentence: I live in the neighborhood and am a regular.
+Label: {"aspects": []}
+
+Sentence: The place is small but the food is fantastic.
+Label: {"aspects": [{"term": "place", "polarity": "negative"}, {"term": "food", "polarity": "positive"}]}
+
+Sentence: The atmosphere is aspiring, and the decor is amazing.
+Label: {"aspects": [{"term": "atmosphere", "polarity": "positive"}, {"term": "decor", "polarity": "positive"}]}

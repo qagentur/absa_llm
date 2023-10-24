@@ -1,0 +1,39 @@
+{
+    "name": "extract_aspects_and_polarities",
+    "description": "Extract sentiment aspects and polarities from a text",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "aspects": {
+                "type": "array",
+                "description": "An array of aspects and their polarities. If no aspects are mentioned in the text, use an empty array.",
+                "minItems": 0,
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "term": {
+                            "type": "string",
+                            "description": "An aspect term, which is a verbatim text snippet. Single or multiword terms naming particular aspects of the reviewed product or service."
+                        },
+                        "polarity": {
+                            "type": "string",
+                            "enum": [
+                                "positive",
+                                "neutral",
+                                "negative"
+                            ],
+                            "description": "The polarity expressed towards the aspect term. Valid polarities are 'positive', 'neutral', 'negative'."
+                        }
+                    },
+                    "required": [
+                        "term",
+                        "polarity"
+                    ]
+                }
+            }
+        },
+        "required": [
+            "aspects"
+        ]
+    }
+}

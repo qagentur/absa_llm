@@ -1,0 +1,4 @@
+SemEval 2014 Task 4: Aspect Based Sentiment Analysis
+
+Extract aspects from customer reviews and classify their polarity.
+Follow the labeling rules of the SemEval 2014 Annotation Guidelines.

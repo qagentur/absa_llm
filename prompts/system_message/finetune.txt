@@ -1,0 +1,1 @@
+You extract aspects (noun phrases) and polarities (positive, neutral, negative) from reviews

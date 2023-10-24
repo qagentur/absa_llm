@@ -1,0 +1,111 @@
+Aspect Based Sentiment Analysis Annotation Guidelines
+
+1. Introduction
+The purpose of this annotation is to detect aspects and their sentiment polarity within sentences. Sentences from customer reviews of restaurants and laptops will be used in this task, i.e., the target entities will be particular restaurants or laptops. For a given target entity - a restaurant or laptop-, the task of the annotator is to identify the following types of information:
+
+- Aspect terms
+Single or multiword terms naming particular aspects of the target entity. For example, in “I liked the service and the staff, but not the food”, the aspect terms are “service”, “staff” and “food”; in “The hard disk is very noisy” the only aspect term is “hard disk”.
+
+- Aspect term polarity
+Each aspect term has to be assigned one of the following polarities based on the sentiment that is expressed in the sentence about it:
+    - positive
+    - negative
+
+For example, in “I hated their fajitas, but their salads were great”, the aspect term “fajitas” has negative polarity and “salads” has positive polarity; in “The fajitas were their starters”, “fajitas” has neutral polarity.
+
+2. Annotation guidelines for aspect terms
+
+2.1. What should be annotated as aspect term
+
+2.1.1 Nominal phrases explicitly mentioning aspects. Notice that in (ii), the aspect term is “cover for the DVD drive”, not simply “DVD drive”. In (vii), there is only one aspect term: the “smoked salmon and roe appetizer”, since this is a single dish, rather than two separate aspect terms “smoked salmon” and “roe appetizer”.
+
+i. The **screen** is bright and the **keyboard** is nice
+ii. The **cover for the DVD drive** soon came off, too--a mark of poor **construction quality**
+iii. Of course, I also have several great **software packages** that came for free including **iWork**, **GarageBand**, and **iMovie**
+iv. **Quality of food** is excellent and **price** is cheap, stick to **pork**, **fish**, **chicken**, **lamb** and **vegetables**
+v. The **food options** rule
+vi. I had **Filet Mignon with garlic mash**
+vii. I ordered the **smoked salmon and roe appetizer** and it was off flavor
+
+2.1.2 Verbs or verbals (words formed from a verb, but functioning as a different part of speech e.g., gerunds and participles) naming aspects, like “priced” and “gaming” below.
+
+i. Fresh , delicious , and reasonably **priced**
+ii. It is pretty sweet when you want **gaming** on the laptop
+
+Remarks:
+
+A. Subjectivity indicators (i.e., words/phrases expressing opinion, evaluation etc.) are NOT considered aspect terms or parts of aspect terms. For example, “malfunction”, “overpriced”, “good”, “great” in the following sentences should NOT be annotated.
+
+i. It had a **cooling system** malfunction after 10 minutes of general use, and would not move past this error
+ii. Good **spreads**, great **beverage selections** and **bagels** really tasty.
+iii. The MacBook is way too overpriced for something so simple and chaotic.
+Note that some terms can be used both as parts of aspect terms as well as subjectivity indicators (e.g., “fresh” in the following sentences).
+iii. Both the **fresh mozzerella slices** and the **Plain Cheese slice** are phenomenal
+iv. The food is **fresh**, delicious , and reasonably **priced**
+
+B. Terms that are often used as aspect terms (e.g., “screen”) may not always be aspect terms; for example, “blue screen crash” is an operating system malfunction. In sentence (ii), “place” refers to the restaurant as a whole and, hence, is not an aspect term; by contrast, in (iii) “place” is an aspect term referring to the space or room of the restaurant.
+
+i. It gave me a blue screen crash twice
+ii. Would recommend - perfect for those looking for a place close to grand central.
+iii. The **staff** was accommodating, the **food** was absolutely delicious, and the **place** is lovely.
+
+C. If an aspect term appears in a sentence more than once, all of its occurrences in the sentence should have spaces around them.sentence should be annotated.
+The only disappointment was the **coat check girls** who didn't seem to know what a customer is on a relatively non-busy night (for the **coat check girls** ).
+
+D. The identified aspect terms should be annotated, even if they appear in quotation marks or brackets. Notice that “okra (bindi)” is a single aspect term below.
+I recommend the **garlic shrimp**, **okra (bindi)**, and anything with **lamb**.
+
+E. The identified aspect terms should be annotated as they appear, even if misspelled.
+The store honored their **warrenty** and made the comment that they don't even recommend the HP brand because of the problems with their **warrentys**.
+
+F. Determiners (e.g., “a”, “the”, “some”, “many”, “all”) should not be included in aspect terms, unless they are parts of embedded noun phrases, as illustrated below.
+The **cover for the DVD drive** soon came off, too--a mark of poor **construction quality**.
+             
+2.2. What should NOT be annotated as aspect term
+
+A. References to the target entity (the restaurant or laptop the review is about) as a whole and mentions of other entities (e.g., “New York City” below). No aspect term should be annotated in the following sentences:
+
+i. Great product
+ii. This is my favorite Italian restaurant in all of New York City
+
+B. The name, the type or the model of the laptop, including the name of the manufacturer (e.g., “netbook”, “MacBook”, “Dell”, “Apple”) or the name of the restaurant. No aspect term should be annotated in the following sentences.
+
+i. The Notebook PC, Toshiba Qosmio is the best gift my father could have ever gotten me. ii. I was at Rao 's last Wed
+
+C. Pronouns (e.g., “it”, “they”, “this”) even if they refer to an aspect. For example, “it” should not be annotated below.
+I love the **screen**, it is amazing
+
+D. Implicit aspect terms, i.e., aspect terms that are not explicitly mentioned, but can be inferred from adjectives or other expressions. For example, sentence (i) can be thought of as referring to an implicit aspect term “price”, because of the adjective “inexpensive”. Only explicitly mentioned aspect terms should be annotated, like “prices” in sentence (ii).
+
+i. I picked it out because it was inexpensive ($400).
+ii. **Prices** are in line
+
+3. Annotation guidelines for aspect term polarities
+
+3.1. Positive, negative polarity
+
+An aspect term should be classified as positive or negative if the sentence expresses a positive or negative, respectively, attitude, opinion, evaluation, emotion, or feeling etc. of an opinion holder towards the aspect term. In sentences (i) and (ii), the opinion holder is the reviewer, whereas in sentence (iii), the opinion holder is a third person.
+
+i. The **technical service** for dell is so 3rd world it might as well not even bother -> “**technical service**”: **negative**
+ii. Metrazur has a beautiful spot overlooking the main terminal -> “**spot**”: **positive**
+iii. My husband had the **mesclun**, **salmon**, and **ice cream** and he enjoyed all 3 **courses** -> “**mesclum**”: **positive**, “**salmon**”: **positive**, “**ice cream**”: **positive**, “**courses**”: **positive**
+
+3.2 Neutral polarity
+
+Aspect terms should be annotated as neutral in the following cases:
+
+A. when a neutral sentiment, wish, or desire toward the aspect term is expressed, e.g., I would like at least a 4 hr. battery life -> “**battery life**”: **neutral**
+
+B. when factual information (no sentiment) about the aspect term is provided. Went there for an office lunch -> “**office lunch**”: **neutral**
+
+C. when positive or negative polarity about the named aspect might be inferred, without being explicit.
+
+i. We were told that the wait was about twenty minutes and there would be no problem for our 8:00 pm curtain call -> “**wait**”: **neutral**
+ii. It took them 25 minutes to bring our appetizer -> “**appetizer**”: **neutral**
+
+D. when expression like “moderate”, “in line”, “nothing out of the ordinary”, “not an issue” etc. are used. Notice, also, that in sentence (iv) the aspect term is “keyboard”, not “backlit keyboard”, since the laptop does not actually have a backlit keyboard.
+
+i. The **price** is moderate -> “**price**”: **neutral**
+ii. **Prices** are in line -> “**prices**”: **neutral**
+iii. The scallion pancakes and fried dumplings were nothing out of the ordinary -> “**scallion pancakes**”: **neutral**, “**fried dumplings**”: **neutral**
+iv. No backlit keyboard, but not an issue for me -> “**keyboard**”: **neutral**

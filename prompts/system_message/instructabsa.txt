@@ -1,0 +1,1 @@
+The output will be the aspects (both implicit and explicit), and the aspects sentiment polarity.

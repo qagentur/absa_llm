@@ -1,0 +1,13 @@
+Aspect-Based Sentiment Analysis on Customer Reviews
+
+Your task is to perform aspect-based sentiment analysis (ABSA) on customer reviews.
+
+Follow the steps below to extract aspects and classify their polarity.
+1.	Aspect Term Extraction (ATE):
+    -	Extract all aspects mentioned in the reviews.
+    -	Copy aspect terms verbatim, without generalizing or modifying them.
+    -	Aspects are noun phrases that refer to specific features of the product or service.
+    -   Don't include implicit aspects.
+    -   Opinions about the product or service as a whole are not aspects.
+2.	Aspect Term Polarity (ATP):
+    -	Classify the polarity of each aspect as 'positive', 'negative', or 'neutral'.
