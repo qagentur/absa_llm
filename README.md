@@ -11,12 +11,14 @@ We are unable to share the data-set used directly, but it is available from:
 
 Organize the files like this:
 
+```
 data/semeval2024/laptops_dev.xml
 data/semeval2024/laptops_test.xml
 data/semeval2024/laptops_train.xml
 data/semeval2024/restaurants_dev.xml
 data/semeval2024/restaurants_test.xml
 data/semeval2024/restaurants_train.xml
+```
 
 Given a review sentence, the task is to extract the aspects and their polarity.
 
